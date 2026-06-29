@@ -1,0 +1,6 @@
+{
+  "name": "Fitness Tracker",
+  "description": "An elegant daily calorie intake and workout logger for fitness enthusiasts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
