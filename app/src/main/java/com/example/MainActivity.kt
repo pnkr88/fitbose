@@ -125,6 +125,7 @@ fun FitnessApp(viewModel: FitnessViewModel) {
     val calorieGoal by viewModel.calorieGoal.collectAsStateWithLifecycle()
     val workoutBurnGoal by viewModel.workoutBurnGoal.collectAsStateWithLifecycle()
     val proteinGoal by viewModel.proteinGoal.collectAsStateWithLifecycle()
+    val workoutDurationGoal by viewModel.workoutDurationGoal.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -169,7 +170,10 @@ fun FitnessApp(viewModel: FitnessViewModel) {
                     when (currentTab) {
                         FitnessTab.DASHBOARD -> DashboardScreen(
                             summaryState = summaryState,
-                            weeklyStats = viewModel.getWeeklyStats()
+                            weeklyStats = viewModel.getWeeklyStats(),
+                            onGoalsUpdated = { cal, work, prot, dur ->
+                                viewModel.updateGoals(cal, work, prot, dur)
+                            }
                         )
                         FitnessTab.CALORIES -> CaloriesScreen(
                             calorieLogs = todayCalorieLogs,
@@ -195,8 +199,9 @@ fun FitnessApp(viewModel: FitnessViewModel) {
                             currentCalorieGoal = calorieGoal,
                             currentWorkoutGoal = workoutBurnGoal,
                             currentProteinGoal = proteinGoal,
-                            onGoalsUpdated = { cal, work, prot ->
-                                viewModel.updateGoals(cal, work, prot)
+                            currentWorkoutDurationGoal = workoutDurationGoal,
+                            onGoalsUpdated = { cal, work, prot, dur ->
+                                viewModel.updateGoals(cal, work, prot, dur)
                             }
                         )
                     }
@@ -336,8 +341,90 @@ fun FitnessBottomBar(
 @Composable
 fun DashboardScreen(
     summaryState: TodaySummaryState,
-    weeklyStats: List<DailyStat>
+    weeklyStats: List<DailyStat>,
+    onGoalsUpdated: (Int, Int, Int, Int) -> Unit
 ) {
+    var showQuickEditDialog by remember { mutableStateOf(false) }
+
+    if (showQuickEditDialog) {
+        var calorieInput by remember { mutableStateOf(summaryState.calorieGoal.toString()) }
+        var durationInput by remember { mutableStateOf(summaryState.workoutDurationGoal.toString()) }
+
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showQuickEditDialog = false },
+            title = {
+                Text(
+                    text = "Quick Edit Daily Goals",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = BentoTextPrimary
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Set your personal targets directly below.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BentoTextSecondary
+                    )
+                    OutlinedTextField(
+                        value = calorieInput,
+                        onValueChange = { calorieInput = it },
+                        label = { Text("Daily Calorie Intake (Kcal)") },
+                        modifier = Modifier.fillMaxWidth().testTag("modal_calorie_goal_input"),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BentoMossPrimary,
+                            unfocusedBorderColor = BentoBorderLight,
+                            focusedLabelColor = BentoMossPrimary,
+                            unfocusedLabelColor = BentoTextSecondary
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    OutlinedTextField(
+                        value = durationInput,
+                        onValueChange = { durationInput = it },
+                        label = { Text("Daily Workout Duration (Mins)") },
+                        modifier = Modifier.fillMaxWidth().testTag("modal_duration_goal_input"),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BentoMossPrimary,
+                            unfocusedBorderColor = BentoBorderLight,
+                            focusedLabelColor = BentoMossPrimary,
+                            unfocusedLabelColor = BentoTextSecondary
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cal = calorieInput.toIntOrNull() ?: summaryState.calorieGoal
+                        val dur = durationInput.toIntOrNull() ?: summaryState.workoutDurationGoal
+                        onGoalsUpdated(cal, summaryState.workoutBurnGoal, summaryState.proteinGoal, dur)
+                        showQuickEditDialog = false
+                    },
+                    modifier = Modifier.testTag("modal_save_goals_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BentoMossPrimary, contentColor = Color.White)
+                ) {
+                    Text("Save Target Limits")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showQuickEditDialog = false }
+                ) {
+                    Text("Cancel", color = BentoTextSecondary)
+                }
+            },
+            containerColor = BentoSurfaceWhite,
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -345,6 +432,52 @@ fun DashboardScreen(
             .padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Quick Goals Target Header Banner (Warm and cohesive Bento style)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = BentoGrayGreen),
+            border = androidx.compose.foundation.BorderStroke(1.dp, BentoGrayGreenBorder)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "🎯", fontSize = 20.sp)
+                    Column {
+                        Text(
+                            text = "Daily Target Goals",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = BentoTextSecondary
+                        )
+                        Text(
+                            text = "${String.format("%,d", summaryState.calorieGoal)} kcal • ${summaryState.workoutDurationGoal} mins workout",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = BentoTextPrimary
+                        )
+                    }
+                }
+                Button(
+                    onClick = { showQuickEditDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BentoMossPrimary,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("quick_set_goals_button"),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(text = "Set Goals", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+        }
         // Daily Calories Bento Card (Moss Light, rounded 32.dp, moss border)
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -478,7 +611,7 @@ fun DashboardScreen(
                             )
                         )
                         Text(
-                            text = "${summaryState.activeMinutes} mins • Today",
+                            text = "${summaryState.activeMinutes} / ${summaryState.workoutDurationGoal} mins",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = BentoLavenderText
@@ -1734,11 +1867,13 @@ fun GoalsScreen(
     currentCalorieGoal: Int,
     currentWorkoutGoal: Int,
     currentProteinGoal: Int,
-    onGoalsUpdated: (Int, Int, Int) -> Unit
+    currentWorkoutDurationGoal: Int,
+    onGoalsUpdated: (Int, Int, Int, Int) -> Unit
 ) {
     var caloriesInput by remember { mutableStateOf(currentCalorieGoal.toString()) }
     var workoutInput by remember { mutableStateOf(currentWorkoutGoal.toString()) }
     var proteinInput by remember { mutableStateOf(currentProteinGoal.toString()) }
+    var durationInput by remember { mutableStateOf(currentWorkoutDurationGoal.toString()) }
     var successMessage by remember { mutableStateOf(false) }
 
     val focusManager = LocalFocusManager.current
@@ -1828,6 +1963,23 @@ fun GoalsScreen(
                 )
 
                 OutlinedTextField(
+                    value = durationInput,
+                    onValueChange = { durationInput = it },
+                    label = { Text("Daily Workout Duration Target (Minutes)") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("target_duration_input"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = BentoMossPrimary,
+                        unfocusedBorderColor = BentoBorderLight,
+                        focusedLabelColor = BentoMossPrimary,
+                        unfocusedLabelColor = BentoTextSecondary
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+
+                OutlinedTextField(
                     value = proteinInput,
                     onValueChange = { proteinInput = it },
                     label = { Text("Daily Protein Intake Target (g)") },
@@ -1849,8 +2001,9 @@ fun GoalsScreen(
                         val cal = caloriesInput.toIntOrNull() ?: currentCalorieGoal
                         val work = workoutInput.toIntOrNull() ?: currentWorkoutGoal
                         val prot = proteinInput.toIntOrNull() ?: currentProteinGoal
+                        val dur = durationInput.toIntOrNull() ?: currentWorkoutDurationGoal
                         
-                        onGoalsUpdated(cal, work, prot)
+                        onGoalsUpdated(cal, work, prot, dur)
                         successMessage = true
                         focusManager.clearFocus()
                     },

@@ -35,10 +35,14 @@ class FitnessViewModel(application: Application) : AndroidViewModel(application)
     private val _proteinGoal = MutableStateFlow(140) // in grams
     val proteinGoal: StateFlow<Int> = _proteinGoal.asStateFlow()
 
-    fun updateGoals(calories: Int, workoutsBurn: Int, protein: Int) {
+    private val _workoutDurationGoal = MutableStateFlow(45) // in minutes
+    val workoutDurationGoal: StateFlow<Int> = _workoutDurationGoal.asStateFlow()
+
+    fun updateGoals(calories: Int, workoutsBurn: Int, protein: Int, workoutDuration: Int) {
         _calorieGoal.value = calories.coerceAtLeast(500)
         _workoutBurnGoal.value = workoutsBurn.coerceAtLeast(50)
         _proteinGoal.value = protein.coerceAtLeast(20)
+        _workoutDurationGoal.value = workoutDuration.coerceAtLeast(5)
     }
 
     // Flows of all data from DB
@@ -63,12 +67,14 @@ class FitnessViewModel(application: Application) : AndroidViewModel(application)
 
     // Summary calculations for Today
     val todaySummary = combine(
-        todayCalorieLogs,
-        todayWorkoutLogs,
+        combine(todayCalorieLogs, todayWorkoutLogs) { cal, work -> Pair(cal, work) },
         calorieGoal,
         workoutBurnGoal,
-        proteinGoal
-    ) { calories, workouts, calGoal, burnGoal, protGoal ->
+        proteinGoal,
+        workoutDurationGoal
+    ) { logs, calGoal, burnGoal, protGoal, durGoal ->
+        val calories = logs.first
+        val workouts = logs.second
         val consumed = calories.sumOf { it.calories }
         val protein = calories.sumOf { it.proteinGrams }
         val carbs = calories.sumOf { it.carbsGrams }
@@ -87,6 +93,7 @@ class FitnessViewModel(application: Application) : AndroidViewModel(application)
             calorieGoal = calGoal,
             workoutBurnGoal = burnGoal,
             proteinGoal = protGoal,
+            workoutDurationGoal = durGoal,
             netCalories = consumed - burned
         )
     }.stateIn(
@@ -214,6 +221,7 @@ data class TodaySummaryState(
     val calorieGoal: Int = 2200,
     val workoutBurnGoal: Int = 400,
     val proteinGoal: Int = 140,
+    val workoutDurationGoal: Int = 45,
     val netCalories: Int = 0
 )
 
