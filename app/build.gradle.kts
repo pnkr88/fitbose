@@ -47,7 +47,7 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      // Use default Android debug signing (no custom keystore required in CI)
     }
   }
   compileOptions {
